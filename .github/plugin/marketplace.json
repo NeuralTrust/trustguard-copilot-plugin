@@ -1,0 +1,17 @@
+{
+  "name": "neuraltrust",
+  "owner": {
+    "name": "NeuralTrust",
+    "email": "hello@neuraltrust.ai"
+  },
+  "metadata": {
+    "description": "NeuralTrust plugins for GitHub Copilot agent security."
+  },
+  "plugins": [
+    {
+      "name": "trustguard",
+      "source": "./trustguard",
+      "description": "TrustGuard AI firewall for Copilot CLI and VS Code agent lifecycle hooks."
+    }
+  ]
+}

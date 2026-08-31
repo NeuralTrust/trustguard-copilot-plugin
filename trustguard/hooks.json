@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "description": "TrustGuard AI firewall for GitHub Copilot lifecycle hooks",
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "sh \"${PLUGIN_ROOT}/hooks/trustguard-hook.sh\" userPromptSubmitted",
+        "powershell": "& \"${PLUGIN_ROOT}/hooks/trustguard-hook.ps1\" -Event userPromptSubmitted",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "sh \"${PLUGIN_ROOT}/hooks/trustguard-hook.sh\" preToolUse",
+        "powershell": "& \"${PLUGIN_ROOT}/hooks/trustguard-hook.ps1\" -Event preToolUse",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "sh \"${PLUGIN_ROOT}/hooks/trustguard-hook.sh\" postToolUse",
+        "powershell": "& \"${PLUGIN_ROOT}/hooks/trustguard-hook.ps1\" -Event postToolUse",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "trustguard",
+  "version": "0.1.0",
+  "description": "TrustGuard AI firewall for GitHub Copilot CLI and VS Code agent hooks.",
+  "author": {
+    "name": "NeuralTrust",
+    "email": "hello@neuraltrust.ai",
+    "url": "https://neuraltrust.ai"
+  },
+  "homepage": "https://neuraltrust.ai",
+  "repository": "https://github.com/NeuralTrust/trustguard-copilot-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "copilot",
+    "security",
+    "firewall",
+    "trustguard",
+    "enterprise",
+    "hooks"
+  ],
+  "hooks": "./hooks.json",
+  "skills": ["./skills/"]
+}

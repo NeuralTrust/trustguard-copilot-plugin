@@ -1,0 +1,49 @@
+# Tests and vets the hook binary sources on every PR and push to main.
+
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.26.5'
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: Test (go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Vet
+        run: go vet ./cli/
+
+      - name: Test
+        run: go test -race ./cli/
+
+      - name: Bootstrap script syntax
+        run: |
+          sh -n trustguard/hooks/trustguard-hook.sh
+          sh trustguard/hooks/trustguard-hook.cmd
+
+      - name: Kandji MDM scripts
+        run: make kandji-syntax
+
+      - name: Plugin manifests
+        run: |
+          python3 -c "import json; json.load(open('trustguard/plugin.json'))"
+          python3 -c "import json; h=json.load(open('trustguard/hooks.json')); assert h['version'] == 1; assert set(h['hooks']) == {'userPromptSubmitted','preToolUse','postToolUse'}"
+          python3 -c "import json; json.load(open('.github/plugin/marketplace.json'))"
+          python3 -c "import json; p=json.load(open('trustguard/plugin.json')); assert p['hooks'] == './hooks.json'; assert 'mcpServers' not in p"
+          python3 -c "import json; p=json.load(open('mdm/copilot/policy-hooks.json')); assert p['version'] == 1; assert 'preToolUse' in p['hooks']"
