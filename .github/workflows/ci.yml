@@ -40,6 +40,9 @@ jobs:
       - name: Kandji MDM scripts
         run: make kandji-syntax
 
+      - name: Policy-hook wrapper
+        run: make policy-hook-test
+
       - name: Plugin manifests
         run: |
           python3 -c "import json; json.load(open('trustguard/plugin.json'))"
@@ -47,3 +50,5 @@ jobs:
           python3 -c "import json; json.load(open('.github/plugin/marketplace.json'))"
           python3 -c "import json; p=json.load(open('trustguard/plugin.json')); assert p['hooks'] == './hooks.json'; assert 'mcpServers' not in p"
           python3 -c "import json; p=json.load(open('mdm/copilot/policy-hooks.json')); assert p['version'] == 1; assert 'preToolUse' in p['hooks']"
+          # The bash half runs on macOS and Linux, so it must not point at a macOS-only path.
+          python3 -c "import json; hooks=json.load(open('mdm/copilot/policy-hooks.json'))['hooks']; cmds=[h['bash'] for v in hooks.values() for h in v]; assert all('Application Support' not in c for c in cmds), cmds; assert all('trustguard-policy-hook' in c for c in cmds), cmds"

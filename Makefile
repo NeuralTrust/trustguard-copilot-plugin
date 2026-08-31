@@ -1,4 +1,4 @@
-.PHONY: build dist test lint install-local uninstall-local kandji-syntax release-plan
+.PHONY: build dist test lint install-local uninstall-local kandji-syntax policy-hook-test release-plan
 
 VERSION ?= dev
 
@@ -18,7 +18,11 @@ lint: ## Vet the sources
 kandji-syntax: ## Shell-check Kandji MDM scripts (bash; they are not POSIX sh)
 	@bash -n mdm/kandji/install-trustguard-copilot.sh
 	@bash -n mdm/kandji/audit-trustguard-copilot.sh
+	@sh -n mdm/copilot/trustguard-policy-hook.sh
 	@echo "kandji scripts: syntax ok"
+
+policy-hook-test: ## Check the MDM policy-hook wrapper behaviour on macOS/Linux
+	@bash scripts/test-policy-hook.sh
 
 release-plan: ## Print what the Release workflow would do (mode + version)
 	@python3 scripts/release.py plan

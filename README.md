@@ -57,7 +57,12 @@ The Kandji scripts under [`mdm/kandji/`](./mdm/kandji) install:
 
 - `/Library/Application Support/TrustGuard/bin/trustguard-copilot`
 - `/Library/Application Support/TrustGuard/copilot.json`
+- `/usr/local/bin/trustguard-policy-hook`
 - `/etc/github-copilot/policy.d/10-trustguard.json`
+
+The policy hooks call the wrapper rather than an absolute collector path, so the
+same file works on macOS and Linux. See
+[`docs/enterprise.md`](./docs/enterprise.md) for per-platform paths.
 
 Copilot CLI policy hooks are machine-wide, load before other hooks, and cannot
 be disabled by repository settings. VS Code hooks are currently preview and can

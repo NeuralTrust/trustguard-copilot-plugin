@@ -2,10 +2,33 @@
 
 ## Local Copilot CLI
 
-Deploy the binary, `/Library/Application Support/TrustGuard/copilot.json`, and
-the policy file under `/etc/github-copilot/policy.d/`. Policy hooks are loaded
-before user, repository, and plugin hooks and cannot be disabled by
-`disableAllHooks`.
+Deploy three files per machine: the collector binary, the managed configuration,
+and the policy hook file under `/etc/github-copilot/policy.d/` (on Windows,
+`C:\ProgramData\GitHub\Copilot\policy.d\`). Policy hooks are loaded before user,
+repository, and plugin hooks and cannot be disabled by `disableAllHooks`.
+
+Paths differ per platform, so `mdm/copilot/policy-hooks.json` never calls the
+collector directly on Unix. It calls the wrapper
+`mdm/copilot/trustguard-policy-hook.sh`, installed at
+`/usr/local/bin/trustguard-policy-hook` on both macOS and Linux, which resolves
+the collector at runtime:
+
+| Platform | Collector | Managed config |
+|---|---|---|
+| macOS | `/Library/Application Support/TrustGuard/bin/trustguard-copilot` | `/Library/Application Support/TrustGuard/copilot.json` |
+| Linux | `/opt/trustguard/bin/trustguard-copilot` or `/usr/local/bin/trustguard-copilot` | `/etc/trustguard/copilot.json` |
+| Windows | `%ProgramData%\TrustGuard\bin\trustguard-copilot.exe` | `%ProgramData%\TrustGuard\copilot.json` |
+
+Set `TRUSTGUARD_COPILOT_BIN` to override the lookup for a non-standard image.
+
+Because Copilot treats a non-zero `preToolUse` exit as a deny, the wrapper
+distinguishes two failures on purpose: if the collector is **not installed** the
+event is allowed, so a machine mid-provisioning is not bricked; if the collector
+**is installed and fails**, the event is enforced (`deny` for `preToolUse`,
+untrusted context for `postToolUse`). The Windows commands apply the same rule
+with a `Test-Path` guard.
+
+`make policy-hook-test` covers both branches.
 
 ## VS Code Agent mode
 
