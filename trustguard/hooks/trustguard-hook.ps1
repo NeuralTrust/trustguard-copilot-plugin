@@ -13,8 +13,8 @@ param(
 $Version = '0.1.0'
 
 $Sha256 = @{
-    'amd64' = ''
-    'arm64' = ''
+    'amd64' = '38f35dd1fcc1167b8e062a0408c3f52f09728cfcc12d09ad82952be0ead36949'
+    'arm64' = '3a35a476e3f628fafd8bdd6f4b49a327db5bd2c2e4bab1a09c60d1e2911e7858'
 }
 
 function Invoke-Hook([string]$Exe) {
