@@ -17,12 +17,12 @@ BASE_URL="${TRUSTGUARD_COPILOT_DOWNLOAD_BASE:-https://github.com/NeuralTrust/tru
 BIN_DIR="${TRUSTGUARD_COPILOT_BIN_DIR:-$HOME/.trustguard/bin}"
 
 # Per-platform SHA-256 of the release binaries (filled per release).
-SHA256_darwin_amd64=""
-SHA256_darwin_arm64=""
-SHA256_linux_amd64=""
-SHA256_linux_arm64=""
-SHA256_windows_amd64=""
-SHA256_windows_arm64=""
+SHA256_darwin_amd64="8ec3228281f0e7a132c32d366371f291a54f84634bef9407770537d455984809"
+SHA256_darwin_arm64="ce72322315e7294705acf7811550243b1237f9e4bd94154f2e50b7425bea3b95"
+SHA256_linux_amd64="db4559d8f795f0cec61affbbff0750034512de80438d666b494e298334c56f04"
+SHA256_linux_arm64="cc2c9f3c2d479763404ad36d7c4276bae43382163e0e782dfbef8fbee11c43d7"
+SHA256_windows_amd64="38f35dd1fcc1167b8e062a0408c3f52f09728cfcc12d09ad82952be0ead36949"
+SHA256_windows_arm64="3a35a476e3f628fafd8bdd6f4b49a327db5bd2c2e4bab1a09c60d1e2911e7858"
 
 fail_open() {
     echo "trustguard-copilot bootstrap: $1 — allowing without evaluation" >&2
