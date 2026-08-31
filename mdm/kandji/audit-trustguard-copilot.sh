@@ -5,10 +5,12 @@ set -euo pipefail
 binary="/Library/Application Support/TrustGuard/bin/trustguard-copilot"
 config="/Library/Application Support/TrustGuard/copilot.json"
 policy="/etc/github-copilot/policy.d/10-trustguard.json"
+wrapper="/usr/local/bin/trustguard-policy-hook"
 
 [[ -x "$binary" ]] || { echo "missing binary: $binary"; exit 1; }
 [[ -f "$config" ]] || { echo "missing config: $config"; exit 1; }
 [[ -f "$policy" ]] || { echo "missing policy hooks: $policy"; exit 1; }
+[[ -x "$wrapper" ]] || { echo "missing policy-hook wrapper: $wrapper"; exit 1; }
 
 python3 - "$config" "$policy" <<'PY'
 import json, sys
