@@ -29,7 +29,7 @@ function Invoke-Hook([string]$Exe) {
 
 function Exit-FailOpen([string]$Message) {
     [Console]::Error.WriteLine("trustguard-copilot bootstrap: $Message - allowing without evaluation")
-    Write-Output '{}'
+    # Empty allow: never print {} (see trustguard-hook.sh).
     exit 0
 }
 

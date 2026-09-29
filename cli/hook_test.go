@@ -47,6 +47,9 @@ func invokeHook(t *testing.T, cfg Config, input map[string]any) hookOutput {
 		t.Fatalf("runHook: %v", err)
 	}
 	var parsed hookOutput
+	if out.Len() == 0 {
+		return parsed // empty stdout is a plain allow
+	}
 	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
 		t.Fatalf("hook output is not JSON: %v (%s)", err, out.String())
 	}
@@ -465,12 +468,8 @@ func TestNativePromptIsEvaluatedForAudit(t *testing.T) {
 	if err := runHookForEvent(bytes.NewReader(raw), &out, testConfig(srv.URL), "userPromptSubmitted"); err != nil {
 		t.Fatal(err)
 	}
-	var parsed hookOutput
-	if err := json.Unmarshal(out.Bytes(), &parsed); err != nil {
-		t.Fatal(err)
-	}
-	if parsed.Decision != "" || parsed.PermissionDecision != "" {
-		t.Fatalf("native userPromptSubmitted output is ignored by Copilot and must remain empty: %+v", parsed)
+	if out.Len() != 0 {
+		t.Fatalf("native userPromptSubmitted output is ignored by Copilot and must remain empty, got %q", out.String())
 	}
 	if (*captured)["protocol"] != "llm" || (*captured)["session_id"] != "copilot-1" {
 		t.Fatalf("native prompt was not evaluated correctly: %v", *captured)
@@ -524,4 +523,23 @@ func hookAttr(t *testing.T, captured *map[string]any, key string) map[string]any
 		t.Fatalf("missing attributes.%s in %v", key, attrs)
 	}
 	return nested
+}
+
+// A plain allow must print nothing: VS Code's Agent Host stops at the first
+// hook that prints a JSON object, so {} would skip later hooks
+// (microsoft/vscode#338457). Copilot treats empty stdout as the default.
+func TestNativeAllowWritesNothing(t *testing.T) {
+	for _, event := range []string{"userPromptSubmitted", "preToolUse", "postToolUse"} {
+		t.Run(event, func(t *testing.T) {
+			srv, _ := stubGuard(t, EvaluateResponse{Status: "allow"})
+			raw := []byte(`{"sessionId":"copilot-1","prompt":"hi","toolName":"view","toolArgs":{"path":"README.md"},"toolResult":{"resultType":"success","textResultForLlm":"ok"}}`)
+			var out bytes.Buffer
+			if err := runHookForEvent(bytes.NewReader(raw), &out, testConfig(srv.URL), event); err != nil {
+				t.Fatal(err)
+			}
+			if out.Len() != 0 {
+				t.Fatalf("allow must write empty stdout, got %q", out.String())
+			}
+		})
+	}
 }

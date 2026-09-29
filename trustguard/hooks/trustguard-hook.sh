@@ -27,7 +27,8 @@ SHA256_windows_arm64="3a35a476e3f628fafd8bdd6f4b49a327db5bd2c2e4bab1a09c60d1e291
 fail_open() {
     echo "trustguard-copilot bootstrap: $1 — allowing without evaluation" >&2
     # Empty allow: GitHub Copilot continues when stdout is empty / exit 0.
-    printf '{}\n'
+    # Never print {}: VS Code's Agent Host treats it as a final answer and
+    # skips later hooks for the event (microsoft/vscode#338457).
     exit 0
 }
 

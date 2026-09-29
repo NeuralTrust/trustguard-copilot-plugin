@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"unicode/utf8"
 )
@@ -95,6 +96,12 @@ func runHookForEvent(stdin io.Reader, stdout io.Writer, cfg Config, event string
 	in.normalize(event)
 
 	out := decideEvent(cfg, in, hookAttributes(raw))
+	// A plain allow writes nothing. Copilot treats empty stdout like {}, but
+	// VS Code's Agent Host stops at the first hook that prints a JSON object,
+	// so {} would skip every later hook for the event (microsoft/vscode#338457).
+	if reflect.ValueOf(out).IsZero() {
+		return nil
+	}
 	if err := json.NewEncoder(stdout).Encode(out); err != nil {
 		return fmt.Errorf("write hook output: %w", err)
 	}
