@@ -179,12 +179,8 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		if in.ToolName == "" {
 			return base, false
 		}
-		if cmd := shellCommand(in); cmd != "" {
-			base.Protocol = "all"
-			base.Payload = map[string]any{"input": cmd}
-			stampToolName(base.Attributes, in.ToolName)
-			return base, true
-		}
+		// Shell tools go as tools/call too: as plain input a command would be
+		// scored as a user prompt, not as tool arguments.
 		base.Protocol = "mcp"
 		base.Payload = map[string]any{
 			"jsonrpc": "2.0",
@@ -215,25 +211,6 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		return base, true
 	}
 	return base, false
-}
-
-// shellCommand returns the command line for Bash-like tool calls.
-func shellCommand(in hookInput) string {
-	switch in.ToolName {
-	case "Bash", "bash", "powershell", "Shell", "shell":
-	default:
-		return ""
-	}
-	input, ok := decodeToolArguments(in.ToolInput).(map[string]any)
-	if !ok {
-		return ""
-	}
-	for _, key := range []string{"command", "input", "script"} {
-		if command, ok := input[key].(string); ok {
-			return strings.TrimSpace(command)
-		}
-	}
-	return ""
 }
 
 func decodeToolArguments(raw json.RawMessage) any {
