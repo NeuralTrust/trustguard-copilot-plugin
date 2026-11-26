@@ -9,7 +9,7 @@ completions do not expose hooks and are outside this plugin's scope.
 | Copilot hook | TrustGuard evaluation | Control |
 | --- | --- | --- |
 | `userPromptSubmitted` | LLM input | Audit/evaluate; Copilot discards command-hook output |
-| `preToolUse` | MCP `tools/call` (shell tools included) | `allow`, `ask`, or `deny` |
+| `preToolUse` | Shell input or MCP `tools/call` | `allow`, `ask`, or `deny` |
 | `postToolUse` | MCP-style tool result | Marks blocked/sensitive output as untrusted context |
 
 The complete hook stdin JSON is preserved in `attributes.copilot`. The source is

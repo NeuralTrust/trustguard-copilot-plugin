@@ -117,27 +117,12 @@ func TestBashPreToolUseBlock(t *testing.T) {
 	if out.HookSpecificOutput == nil || out.HookSpecificOutput.PermissionDecision != "deny" {
 		t.Fatalf("expected PreToolUse deny, got %+v", out)
 	}
-	assertShellToolsCall(t, *captured, "Bash")
-}
-
-func assertShellToolsCall(t *testing.T, captured map[string]any, name string) {
-	t.Helper()
-	if captured["protocol"] != "mcp" {
-		t.Fatalf("expected protocol=mcp for shell, got %v", captured["protocol"])
+	if (*captured)["protocol"] != "all" {
+		t.Fatalf("expected protocol=all for Bash, got %v", (*captured)["protocol"])
 	}
-	payload := captured["payload"].(map[string]any)
-	if payload["method"] != "tools/call" {
-		t.Fatalf("expected tools/call envelope, got %v", payload)
-	}
-	params := payload["params"].(map[string]any)
-	if params["name"] != name {
-		t.Fatalf("expected params.name=%s, got %v", name, params)
-	}
-	if params["arguments"].(map[string]any)["command"] != "rm -rf /" {
-		t.Fatalf("expected params.arguments.command, got %v", params)
-	}
-	if attrs := captured["attributes"].(map[string]any); attrs["tool"] != nil {
-		t.Fatalf("tools/call must not stamp attributes.tool, got %v", attrs)
+	payload := (*captured)["payload"].(map[string]any)
+	if payload["input"] != "rm -rf /" {
+		t.Fatalf("unexpected payload: %v", payload)
 	}
 }
 
@@ -230,7 +215,7 @@ func TestMCPCallName(t *testing.T) {
 }
 
 func TestPreToolUseTransformAskEmitsAsk(t *testing.T) {
-	srv, _ := stubGuard(t, EvaluateResponse{
+	srv, captured := stubGuard(t, EvaluateResponse{
 		Status: "transform",
 		Findings: []Finding{{
 			Source: FindingSource{Kind: "detector", DetectorName: "dlp"},
@@ -247,6 +232,10 @@ func TestPreToolUseTransformAskEmitsAsk(t *testing.T) {
 	})
 	if out.HookSpecificOutput == nil || out.HookSpecificOutput.PermissionDecision != "ask" {
 		t.Fatalf("expected PreToolUse ask, got %+v", out)
+	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if attrs["tool"].(map[string]any)["name"] != "Bash" {
+		t.Fatalf("expected attributes.tool.name=Bash, got %v", attrs)
 	}
 }
 
@@ -554,7 +543,9 @@ func TestNativePreToolUseDenies(t *testing.T) {
 	if parsed.PermissionDecision != "deny" {
 		t.Fatalf("expected native deny, got %+v", parsed)
 	}
-	assertShellToolsCall(t, *captured, "bash")
+	if (*captured)["protocol"] != "all" {
+		t.Fatalf("expected shell protocol, got %v", (*captured)["protocol"])
+	}
 }
 
 func TestNativePostToolUseAddsContext(t *testing.T) {
