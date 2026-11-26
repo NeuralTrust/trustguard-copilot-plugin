@@ -199,16 +199,13 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		if allBlank(blocks) {
 			return base, false
 		}
-		content := make([]any, 0, len(blocks))
-		for _, b := range blocks {
-			content = append(content, map[string]any{"type": "text", "text": b})
-		}
+
 		base.Direction = "output"
 		base.Protocol = "mcp"
 		base.Payload = map[string]any{
 			"jsonrpc": "2.0",
 			"id":      1,
-			"result":  map[string]any{"content": content},
+			"result":  map[string]any{"content": blocks},
 		}
 		stampToolName(base.Attributes, mcpCallName(in.ToolName))
 		return base, true
@@ -240,7 +237,7 @@ func decodeToolArguments(raw json.RawMessage) any {
 
 // toolResultBlocks returns the text blocks the model saw, so each is scored as
 // TrustGate scores an MCP result. A native textResultForLlm is already that text.
-func toolResultBlocks(in hookInput) []string {
+func toolResultBlocks(in hookInput) []json.RawMessage {
 	if len(in.ToolResponse) > 0 {
 		return toolResponseBlocks(in.ToolResponse)
 	}
@@ -252,15 +249,15 @@ func toolResultBlocks(in hookInput) []string {
 		TextResultNative string `json:"textResultForLlm"`
 	}
 	if err := json.Unmarshal(in.ToolResult, &result); err == nil {
-		return []string{firstNonEmpty(result.TextResultForLLM, result.TextResultNative)}
+		return []json.RawMessage{textBlock(firstNonEmpty(result.TextResultForLLM, result.TextResultNative))}
 	}
 	return toolResponseBlocks(in.ToolResult)
 }
 
-// toolResponseBlocks splits a tool response into its text blocks. A string
-// (VS Code stringifies results) is decoded when it holds JSON; unknown shapes
-// stay one block.
-func toolResponseBlocks(raw json.RawMessage) []string {
+// toolResponseBlocks returns a tool response's MCP content blocks, every type and
+// unchanged. A string (VS Code stringifies results) is decoded when it holds
+// JSON; unknown shapes stay one text block.
+func toolResponseBlocks(raw json.RawMessage) []json.RawMessage {
 	raw = json.RawMessage(strings.TrimSpace(string(raw)))
 	if len(raw) == 0 {
 		return nil
@@ -268,74 +265,108 @@ func toolResponseBlocks(raw json.RawMessage) []string {
 	var asString string
 	if err := json.Unmarshal(raw, &asString); err == nil {
 		if inner := strings.TrimSpace(asString); json.Valid([]byte(inner)) {
-			if texts := structuredBlocks(json.RawMessage(inner)); len(texts) > 0 {
-				return texts
+			if blocks := structuredBlocks(json.RawMessage(inner)); blocks != nil {
+				return blocks
 			}
 		}
-		return []string{asString}
+		return []json.RawMessage{textBlock(asString)}
 	}
-	if texts := structuredBlocks(raw); len(texts) > 0 {
-		return texts
+	if blocks := structuredBlocks(raw); blocks != nil {
+		return blocks
 	}
 	var compact bytes.Buffer
 	if err := json.Compact(&compact, raw); err != nil {
-		return []string{string(raw)}
+		return []json.RawMessage{textBlock(string(raw))}
 	}
-	return []string{compact.String()}
+	return []json.RawMessage{textBlock(compact.String())}
 }
 
 // structuredBlocks reads an MCP content array or a {content: [...]} result.
-func structuredBlocks(raw json.RawMessage) []string {
-	if texts := textBlocks(raw); len(texts) > 0 {
-		return texts
+func structuredBlocks(raw json.RawMessage) []json.RawMessage {
+	if blocks := contentArray(raw); blocks != nil {
+		return blocks
 	}
 	var result struct {
 		Content json.RawMessage `json:"content"`
 	}
 	if err := json.Unmarshal(raw, &result); err == nil && len(result.Content) > 0 {
-		return textBlocks(result.Content)
+		return contentArray(result.Content)
 	}
 	return nil
 }
 
-// textBlocks returns the texts of an MCP content array; non-text blocks are skipped.
-func textBlocks(raw json.RawMessage) []string {
-	var blocks []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(raw, &blocks); err != nil {
-		return nil
-	}
-	var texts []string
-	for _, b := range blocks {
-		if b.Type == "" {
-			return nil
-		}
-		if b.Type == "text" {
-			texts = append(texts, b.Text)
-		}
-	}
-	return texts
+// textBlock wraps plain text as one MCP text block.
+func textBlock(s string) json.RawMessage {
+	b, _ := json.Marshal(map[string]string{"type": "text", "text": s})
+	return b
 }
 
-// clipBlocks applies one byte budget across all blocks, cutting the last one kept.
-func clipBlocks(blocks []string, budget int) []string {
-	var out []string
+// contentArray returns the original blocks of an MCP content array, nil for any other shape.
+func contentArray(raw json.RawMessage) []json.RawMessage {
+	var blocks []json.RawMessage
+	if err := json.Unmarshal(raw, &blocks); err != nil || len(blocks) == 0 {
+		return nil
+	}
+	for _, b := range blocks {
+		var head struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(b, &head); err != nil || head.Type == "" {
+			return nil
+		}
+	}
+	return blocks
+}
+
+// clipBlocks applies one byte budget across the blocks in order: text is cut
+// UTF-8 safe, any other block is kept whole or dropped so a later one can still fit.
+func clipBlocks(blocks []json.RawMessage, budget int) []json.RawMessage {
+	var out []json.RawMessage
 	for _, b := range blocks {
 		if budget <= 0 {
 			break
 		}
-		b = clip(b, budget)
-		budget -= len(b)
-		out = append(out, b)
+		if kept, used, ok := clipBlock(b, budget); ok {
+			out = append(out, kept)
+			budget -= used
+		}
 	}
 	return out
 }
 
-func allBlank(blocks []string) bool {
+func clipBlock(b json.RawMessage, budget int) (json.RawMessage, int, bool) {
+	var fields map[string]json.RawMessage
+	var typ string
+	if json.Unmarshal(b, &fields) == nil {
+		_ = json.Unmarshal(fields["type"], &typ)
+	}
+	if typ == "text" {
+		var text string
+		if json.Unmarshal(fields["text"], &text) == nil {
+			clipped := clip(text, budget)
+			if clipped == text {
+				return b, len(text), true
+			}
+			fields["text"], _ = json.Marshal(clipped)
+			out, _ := json.Marshal(fields)
+			return out, len(clipped), true
+		}
+	}
+	var compact bytes.Buffer
+	if json.Compact(&compact, b) != nil || compact.Len() > budget {
+		return nil, 0, false
+	}
+	return compact.Bytes(), compact.Len(), true
+}
+
+// allBlank is true when no block carries anything to score; a non-text block counts as content.
+func allBlank(blocks []json.RawMessage) bool {
 	for _, b := range blocks {
-		if strings.TrimSpace(b) != "" {
+		var t struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(b, &t) != nil || t.Type != "text" || strings.TrimSpace(t.Text) != "" {
 			return false
 		}
 	}
