@@ -10,11 +10,11 @@ param(
     [switch]$InstallOnly
 )
 
-$Version = '0.1.1'
+$Version = '0.1.2'
 
 $Sha256 = @{
-    'amd64' = '4d327f2320efc4a665d3c5782a01b48f47cc82631d6ec781b23702f79753e064'
-    'arm64' = '8a1b4f36e2217b455101c3af1909e550d1eb519ede548bc8e843a1795ef87ff6'
+    'amd64' = '684790f6766a00a24abb5ca589d898219d4fd090098ef94b1165bb9389712599'
+    'arm64' = 'b0605a693179d889a6905d183a95f690abb07a1815aff4846b1d1aa63f4a57d1'
 }
 
 function Invoke-Hook([string]$Exe) {
