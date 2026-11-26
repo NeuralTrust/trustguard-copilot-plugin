@@ -11,18 +11,18 @@
 # The VERSION and SHA256_* table are updated per release.
 set -u
 
-VERSION="0.1.1"
+VERSION="0.1.2"
 EVENT="${1:-}"
 BASE_URL="${TRUSTGUARD_COPILOT_DOWNLOAD_BASE:-https://github.com/NeuralTrust/trustguard-copilot-plugin/releases/download}"
 BIN_DIR="${TRUSTGUARD_COPILOT_BIN_DIR:-$HOME/.trustguard/bin}"
 
 # Per-platform SHA-256 of the release binaries (filled per release).
-SHA256_darwin_amd64="d172ec79f532a6665ef5b579f25e41666e506a6b2cf3aaf4596de8d0af1194ab"
-SHA256_darwin_arm64="c8e3e67952259ee20e1ac6d7747ff014178d40a106345d5fe36a6620381d0ae1"
-SHA256_linux_amd64="933bdc3d14567ffb0f2a6597029ac7279508c72023a82a4334dc9265638e734c"
-SHA256_linux_arm64="c307cd2def474ed9785af709aedc60c480604aed37f48bb6ba3e0f625d1f8fdf"
-SHA256_windows_amd64="4d327f2320efc4a665d3c5782a01b48f47cc82631d6ec781b23702f79753e064"
-SHA256_windows_arm64="8a1b4f36e2217b455101c3af1909e550d1eb519ede548bc8e843a1795ef87ff6"
+SHA256_darwin_amd64="1b729b5fbf086c083dd46055e2f6ae0ca9d155343994fab044926ad6b0db51e5"
+SHA256_darwin_arm64="be317dd5c3c1dfee1ace05a25178057ce1dc92c3246566c0308cc77e7cbf417f"
+SHA256_linux_amd64="33a6d2cfa0630e2b214675f13be69de95ea2177b077697b72a48e261ec1ba776"
+SHA256_linux_arm64="c2791ef216d1a06dbfe74b697af343c3f478e016ffe7c94aeecc7e5d2d3f2af9"
+SHA256_windows_amd64="684790f6766a00a24abb5ca589d898219d4fd090098ef94b1165bb9389712599"
+SHA256_windows_arm64="b0605a693179d889a6905d183a95f690abb07a1815aff4846b1d1aa63f4a57d1"
 
 fail_open() {
     echo "trustguard-copilot bootstrap: $1 — allowing without evaluation" >&2
