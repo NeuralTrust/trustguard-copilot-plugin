@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -194,18 +195,20 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		return base, true
 
 	case "PostToolUse":
-		text := toolResultText(in)
-		if strings.TrimSpace(text) == "" {
+		blocks := clipBlocks(toolResultBlocks(in), cfg.MaxContentBytes)
+		if allBlank(blocks) {
 			return base, false
+		}
+		content := make([]any, 0, len(blocks))
+		for _, b := range blocks {
+			content = append(content, map[string]any{"type": "text", "text": b})
 		}
 		base.Direction = "output"
 		base.Protocol = "mcp"
 		base.Payload = map[string]any{
 			"jsonrpc": "2.0",
 			"id":      1,
-			"result": map[string]any{
-				"content": []any{map[string]any{"type": "text", "text": clip(text, cfg.MaxContentBytes)}},
-			},
+			"result":  map[string]any{"content": content},
 		}
 		stampToolName(base.Attributes, mcpCallName(in.ToolName))
 		return base, true
@@ -235,33 +238,108 @@ func decodeToolArguments(raw json.RawMessage) any {
 	return map[string]any{"input": string(raw)}
 }
 
-func toolResponseText(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		return asString
-	}
-	// Prefer a compact JSON encoding so MCP result objects stay inspectable.
-	return strings.TrimSpace(string(raw))
-}
-
-func toolResultText(in hookInput) string {
+// toolResultBlocks returns the text blocks the model saw, so each is scored as
+// TrustGate scores an MCP result. A native textResultForLlm is already that text.
+func toolResultBlocks(in hookInput) []string {
 	if len(in.ToolResponse) > 0 {
-		return toolResponseText(in.ToolResponse)
+		return toolResponseBlocks(in.ToolResponse)
 	}
 	if len(in.ToolResult) == 0 {
-		return ""
+		return nil
 	}
 	var result struct {
 		TextResultForLLM string `json:"text_result_for_llm"`
 		TextResultNative string `json:"textResultForLlm"`
 	}
 	if err := json.Unmarshal(in.ToolResult, &result); err == nil {
-		return firstNonEmpty(result.TextResultForLLM, result.TextResultNative)
+		return []string{firstNonEmpty(result.TextResultForLLM, result.TextResultNative)}
 	}
-	return toolResponseText(in.ToolResult)
+	return toolResponseBlocks(in.ToolResult)
+}
+
+// toolResponseBlocks splits a tool response into its text blocks. A string
+// (VS Code stringifies results) is decoded when it holds JSON; unknown shapes
+// stay one block.
+func toolResponseBlocks(raw json.RawMessage) []string {
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	if len(raw) == 0 {
+		return nil
+	}
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		if inner := strings.TrimSpace(asString); json.Valid([]byte(inner)) {
+			if texts := structuredBlocks(json.RawMessage(inner)); len(texts) > 0 {
+				return texts
+			}
+		}
+		return []string{asString}
+	}
+	if texts := structuredBlocks(raw); len(texts) > 0 {
+		return texts
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, raw); err != nil {
+		return []string{string(raw)}
+	}
+	return []string{compact.String()}
+}
+
+// structuredBlocks reads an MCP content array or a {content: [...]} result.
+func structuredBlocks(raw json.RawMessage) []string {
+	if texts := textBlocks(raw); len(texts) > 0 {
+		return texts
+	}
+	var result struct {
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(raw, &result); err == nil && len(result.Content) > 0 {
+		return textBlocks(result.Content)
+	}
+	return nil
+}
+
+// textBlocks returns the texts of an MCP content array; non-text blocks are skipped.
+func textBlocks(raw json.RawMessage) []string {
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return nil
+	}
+	var texts []string
+	for _, b := range blocks {
+		if b.Type == "" {
+			return nil
+		}
+		if b.Type == "text" {
+			texts = append(texts, b.Text)
+		}
+	}
+	return texts
+}
+
+// clipBlocks applies one byte budget across all blocks, cutting the last one kept.
+func clipBlocks(blocks []string, budget int) []string {
+	var out []string
+	for _, b := range blocks {
+		if budget <= 0 {
+			break
+		}
+		b = clip(b, budget)
+		budget -= len(b)
+		out = append(out, b)
+	}
+	return out
+}
+
+func allBlank(blocks []string) bool {
+	for _, b := range blocks {
+		if strings.TrimSpace(b) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func applyVerdict(cfg Config, res *EvaluateResponse) verdict {
