@@ -456,6 +456,58 @@ func TestEvaluateStampsFullHookJSON(t *testing.T) {
 	if copilot["permission_mode"] != "default" || copilot["prompt_id"] != "550e8400-e29b-41d4-a716-446655440000" || copilot["future_extra"] != "kept" {
 		t.Fatalf("attributes.copilot must keep every stdin field, got %v", copilot)
 	}
+	if _, ok := copilot["prompt"]; ok {
+		t.Fatalf("attributes.copilot must not repeat the prompt the payload carries, got %v", copilot)
+	}
+}
+
+// The content an event is evaluated on travels once, in the payload, whichever
+// names it arrives under: a copy under attributes is stored unclipped and never
+// masked by DLP.
+func TestEvaluateKeepsToolContentOutOfHookAttributes(t *testing.T) {
+	cases := map[string]struct {
+		event string
+		input map[string]any
+	}{
+		"VS Code PreToolUse": {"", map[string]any{
+			"hook_event_name": "PreToolUse", "tool_name": "bash", "tool_use_id": "call_1",
+			"tool_input": map[string]any{"command": "echo 555-0100"}, "session_id": "s_1", "cwd": "/tmp/demo",
+		}},
+		"VS Code PostToolUse": {"", map[string]any{
+			"hook_event_name": "PostToolUse", "tool_name": "bash", "tool_use_id": "call_1",
+			"tool_input": map[string]any{"command": "echo 555-0100"}, "tool_response": "555-0100", "tool_result": "555-0100",
+			"session_id": "s_1", "cwd": "/tmp/demo",
+		}},
+		"native preToolUse": {"preToolUse", map[string]any{
+			"toolName": "bash", "toolArgs": `{"command":"echo 555-0100"}`, "sessionId": "s_1", "cwd": "/tmp/demo", "timestamp": 1,
+		}},
+		"native postToolUse": {"postToolUse", map[string]any{
+			"toolName": "bash", "toolArgs": `{"command":"echo 555-0100"}`,
+			"toolResult": map[string]any{"resultType": "success", "textResultForLlm": "555-0100"}, "sessionId": "s_1", "cwd": "/tmp/demo", "timestamp": 1,
+		}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
+			raw, _ := json.Marshal(tc.input)
+			var out bytes.Buffer
+			if err := runHookForEvent(bytes.NewReader(raw), &out, testConfig(srv.URL), tc.event); err != nil {
+				t.Fatal(err)
+			}
+			if (*captured)["payload"] == nil {
+				t.Fatalf("expected an evaluated payload, got %v", *captured)
+			}
+			copilot := hookAttr(t, captured, "copilot")
+			for _, field := range hookContentFields {
+				if _, ok := copilot[field]; ok {
+					t.Fatalf("attributes.copilot must not carry %s, got %v", field, copilot)
+				}
+			}
+			if copilot["cwd"] != "/tmp/demo" {
+				t.Fatalf("attributes.copilot must keep the event's metadata, got %v", copilot)
+			}
+		})
+	}
 }
 
 func TestNativePromptIsEvaluatedForAudit(t *testing.T) {
