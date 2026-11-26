@@ -28,7 +28,7 @@ func TestClipIsUTF8Safe(t *testing.T) {
 	}
 }
 
-func TestShellToolsSentAsToolsCall(t *testing.T) {
+func TestShellToolsSentAsAllInput(t *testing.T) {
 	for _, name := range []string{"Bash", "bash", "powershell", "Shell", "shell"} {
 		t.Run(name, func(t *testing.T) {
 			srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
@@ -38,7 +38,18 @@ func TestShellToolsSentAsToolsCall(t *testing.T) {
 				"tool_input":      `{"command":"rm -rf /"}`,
 				"session_id":      "thr_1",
 			})
-			assertShellToolsCall(t, *captured, name)
+			got := *captured
+			if got["protocol"] != "all" || got["direction"] != "input" {
+				t.Fatalf("expected protocol=all direction=input, got %v", got)
+			}
+			payload := got["payload"].(map[string]any)
+			if payload["input"] != "rm -rf /" {
+				t.Fatalf("unexpected payload: %v", payload)
+			}
+			attrs := got["attributes"].(map[string]any)
+			if attrs["tool"].(map[string]any)["name"] != name {
+				t.Fatalf("expected attributes.tool.name=%s, got %v", name, attrs)
+			}
 		})
 	}
 }
